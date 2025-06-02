@@ -18,7 +18,7 @@ func (mux *MyMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 }
 func main() {
-
+	// Custom Mux
 	router := &MyMux{}
 	server := http.Server{
 		Addr:    ":9090",
