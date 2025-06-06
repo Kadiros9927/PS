@@ -2,6 +2,7 @@ package verify
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"sync"
 )
@@ -59,7 +60,10 @@ func DeleteByHash(hash string) (string, bool) {
 	}
 
 	newData, _ := json.MarshalIndent(updated, "", "  ")
-	os.WriteFile(storageFile, newData, 0644)
-
+	err := os.WriteFile(storageFile, newData, 0644)
+	if err != nil {
+		log.Printf("ошибка при записи файла: %v", err)
+		return "", false
+	}
 	return foundEmail, matched
 }

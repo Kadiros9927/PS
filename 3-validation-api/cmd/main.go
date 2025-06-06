@@ -14,7 +14,7 @@ func main() {
 	router.HandleFunc("/verify/", verify.VerifyHandler())
 
 	server := http.Server{
-		Addr:    ":8080",
+		Addr:    ":8081",
 		Handler: router,
 	}
 

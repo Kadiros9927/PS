@@ -1,21 +1,19 @@
 package verify
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"github.com/jordan-wright/email"
 	"go/git-ps/3-validation-api/config"
 	"io"
-	"math/rand"
 	"net/http"
+	"net/smtp"
 	"strings"
-	"time"
 )
 
 //todo type VerifyHandlerDeps struct {}
-
-var hashStorage = make(map[string]string)
 
 func NewVerifyHandler(cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -32,19 +30,20 @@ func NewVerifyHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 
-		rand.Seed((time.Now().UnixNano()))
-		randomData := fmt.Sprintf("%s:%d", recipient, rand.Int63())
-		sha := sha256.Sum256([]byte(randomData))
-		hash := hex.EncodeToString(sha[:])
+		hash, err := generateHash(recipient)
+		if err != nil {
+			http.Error(w, "Ошибка генерации хеша", http.StatusInternalServerError)
+			return
+		}
 
 		rec := Record{Email: recipient, Hash: hash}
-		err := SaveRecord(rec)
+		err = SaveRecord(rec)
 		if err != nil {
 			http.Error(w, "Ошибка сохранения данных: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		verifyURL := fmt.Sprintf("https://localhost:8080/verify/%s", hash)
+		verifyURL := fmt.Sprintf("http://localhost:8081/verify/%s", hash)
 
 		createAndSendVerifyEmail(recipient, verifyURL, cfg)
 	}
@@ -82,10 +81,26 @@ func createAndSendVerifyEmail(recipient, verifyURL string, cfg config.Config) {
 	e.Text = []byte(fmt.Sprintf("Click the link to verify your email: %s", verifyURL))
 
 	fmt.Println(string(e.Text))
-	//err := e.Send(cfg.Address, smtp.PlainAuth("", cfg.Email, cfg.Password, cfg.Address[:strings.Index(cfg.Address, ":")]))
+	err := e.Send(cfg.Address, smtp.PlainAuth("", cfg.Email, cfg.Password, cfg.Address[:strings.Index(cfg.Address, ":")]))
 
-	//if err != nil {
-	//	fmt.Println("Не удалось отправить email: "+err.Error(), http.StatusInternalServerError)
-	//}
+	if err != nil {
+		fmt.Println("Не удалось отправить email: "+err.Error(), http.StatusInternalServerError)
+	}
 	fmt.Println("Email sent successfully to " + recipient)
+}
+
+func generateHash(email string) (string, error) {
+	// Генерируем 16 случайных байт
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("не удалось сгенерировать случайные байты: %w", err)
+	}
+
+	// Добавляем email для уникальности
+	input := append([]byte(email), b...)
+
+	// SHA-256 хеш
+	sha := sha256.Sum256(input)
+	return hex.EncodeToString(sha[:]), nil
 }
